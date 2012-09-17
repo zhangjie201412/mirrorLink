@@ -8,6 +8,8 @@
 #include <sys/un.h>             /* for Unix domain sockets */
 #include <sys/epoll.h>
 
+#include "global.h"
+
 
 struct descripState {
 	int control[2];
@@ -15,10 +17,7 @@ struct descripState {
 	int local;
 };
 
-struct mydata {
-	int x;
-	int y;
-};
+
 
 static struct descripState _desState[1];
 
@@ -73,15 +72,15 @@ remot_thread(void* arg)
 	struct descripState* state = (struct descripState* )arg;
 	int remote_fd = state->remot;
 	int n;
-	struct mydata md;
-	char buff[32];
+	struct transpata trans;
+	char buff[200];
 	while(1) {
-		if((n = read(remote_fd, buff, 32)) > 0) {
-			bzero(&md, sizeof md);
-			memcpy(&md, buff, sizeof md);
-			printf("remote recive: x = %d, y = %d\n", md.x, md.y);
+		if((n = read(remote_fd, buff, 200)) > 0) {
+			bzero(&trans, sizeof trans);
+			memcpy(&trans, buff, sizeof trans);
+			printf("remote recive: x = %f, y = %f\n", trans.latitude, trans.longitude);
 			//write to control
-			if(write(state->control[0], buff, 32) != 32)
+			if(write(state->control[0], buff, 200) != 200)
 				printf("remote error: write error\n");
 
 		} else if(n < 0)
@@ -193,7 +192,7 @@ int main(void)
 					s->local = local_connfd;
 					//create a thread to do with local works
 					//....
-					ret = pthread_create(&local_pid, NULL, local_thread, s);
+		//			ret = pthread_create(&local_pid, NULL, local_thread, s);
 				} else if(fd == listen_fds[1]) {
 					remot_connfd = accept(fd, (struct sockaddr *)NULL,
 							NULL);
@@ -211,15 +210,18 @@ int main(void)
 				} else if(fd == control_fd) {
 					//read from control[0]
 					//....
-					char buff[32];
-					struct mydata md;
+					char buff[200];
+					struct transpata trans;
+					char recv_ok[4] = "RVOK";
 					int n;
-					if((n = read(control_fd, buff, 32)) > 0) {
-						bzero(&md, sizeof md);
-						memcpy(&md, buff, sizeof md);
-						printf("recive: x = %d, y = %d\n", md.x, md.y);
+					if((n = read(fd, buff, 200)) > 0) {
+						bzero(&trans, sizeof trans);
+						memcpy(&trans, buff, sizeof trans);
+						printf("recive: x = %f, y = %f\n", trans.latitude, trans.longitude);
 						//write to control
-						if(write(s->local, buff, 32) != 32)
+//						if(write(s->local, buff, 32) != 32)
+//							printf("remote error: write error\n");
+						if(write(s->remot, recv_ok, 4) != 4)
 							printf("remote error: write error\n");
 
 					} else if(n < 0)
