@@ -17,10 +17,17 @@
 #define LOGI(...)	((void)__android_log_print(ANDROID_LOG_INFO, "-mirror-", __VA_ARGS__))
 #define LOGE(...)	((void)__android_log_print(ANDROID_LOG_ERROR, "-mirror-", __VA_ARGS__))
 
+#define MAX_SIZE	300
+
 struct transpata {
+	char tag[4];
 	double latitude;
 	double longitude;
+	float mx;
+	float my;
+	float mz;
 };
+
 
 int sockfd;
 
@@ -67,19 +74,57 @@ Java_com_android_example_Transpata_connect(JNIEnv *env, jobject obj, jstring ipa
 }
 
 JNIEXPORT jint JNICALL
-Java_com_android_example_Transpata_send(JNIEnv *env, jobject obj, jdouble lat, jdouble lng)
+Java_com_android_example_Transpata_sendGPS(JNIEnv *env, jobject obj, jdouble lat, jdouble lng)
 {
 	struct transpata trans;
-	char send_buff[200];
+	char send_buff[MAX_SIZE];
 	char recv_buff[4] = "";
 	int n, try = 0;
+	char tag[4] = "SGPS";
+	memcpy(trans.tag, &tag, sizeof tag);
 	trans.latitude = (double)lat;
 	trans.longitude = (double)lng;
-	memset(send_buff, 0, 200);
+	memset(send_buff, 0, MAX_SIZE);
 	memcpy(send_buff, &trans, sizeof trans);
 
 again:
-	if(write(sockfd, send_buff, 200) != 200)
+	if(write(sockfd, send_buff, MAX_SIZE) != MAX_SIZE)
+		LOGE("write error");
+	if((n = read(sockfd, recv_buff, 4)) > 0) {
+		if(!memcmp(recv_buff, "RVOK", 4)) {
+			LOGI("recv %s", recv_buff);
+		} else{
+			if(try++ < 10)
+				goto again;
+		}
+	} else if(n != 4) {
+		if(try++ < 10)
+			goto again;
+	} else if(n < 0) {
+		LOGE("read error");
+	}
+
+
+	return 0;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_android_example_Transpata_sendMAG(JNIEnv *env, jobject obj, jfloat x, jfloat y, jfloat z)
+{
+	struct transpata trans;
+	char send_buff[MAX_SIZE];
+	char recv_buff[4] = "";
+	int n, try = 0;
+	char tag[4] = "SMAG";
+	memcpy(trans.tag, &tag, sizeof tag);
+	trans.mx = (float)x;
+	trans.my = (float)y;
+	trans.mz = (float)z;
+	memset(send_buff, 0, MAX_SIZE);
+	memcpy(send_buff, &trans, sizeof trans);
+	
+again:
+	if(write(sockfd, send_buff, MAX_SIZE) != MAX_SIZE)
 		LOGE("write error");
 	if((n = read(sockfd, recv_buff, 4)) > 0) {
 		if(!memcmp(recv_buff, "RVOK", 4)) {

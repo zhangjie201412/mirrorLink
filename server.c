@@ -10,7 +10,6 @@
 
 #include "global.h"
 
-
 struct descripState {
 	int control[2];
 	int remot;
@@ -59,12 +58,7 @@ epoll_deregister( int  epoll_fd, int  fd )
     return ret;
 }
 
-static void
-local_thread(void* arg)
-{
-	struct descripState* state = (struct descripState* )arg;
 
-}
 
 static void
 remot_thread(void* arg)
@@ -73,14 +67,12 @@ remot_thread(void* arg)
 	int remote_fd = state->remot;
 	int n;
 	struct transpata trans;
-	char buff[200];
+	char buff[MAX_SIZE];
 	while(1) {
-		if((n = read(remote_fd, buff, 200)) > 0) {
+		if((n = read(remote_fd, buff, MAX_SIZE)) > 0) {
 			bzero(&trans, sizeof trans);
-			memcpy(&trans, buff, sizeof trans);
-			printf("remote recive: x = %f, y = %f\n", trans.latitude, trans.longitude);
 			//write to control
-			if(write(state->control[0], buff, 200) != 200)
+			if(write(state->control[0], buff, MAX_SIZE) != MAX_SIZE)
 				printf("remote error: write error\n");
 
 		} else if(n < 0)
@@ -210,17 +202,22 @@ int main(void)
 				} else if(fd == control_fd) {
 					//read from control[0]
 					//....
-					char buff[200];
+					char buff[MAX_SIZE];
 					struct transpata trans;
 					char recv_ok[4] = "RVOK";
 					int n;
-					if((n = read(fd, buff, 200)) > 0) {
-						bzero(&trans, sizeof trans);
-						memcpy(&trans, buff, sizeof trans);
-						printf("recive: x = %f, y = %f\n", trans.latitude, trans.longitude);
-						//write to control
-//						if(write(s->local, buff, 32) != 32)
-//							printf("remote error: write error\n");
+					bzero(&trans, sizeof trans);
+					memcpy(&trans, buff, sizeof trans);
+
+					if((n = read(fd, buff, MAX_SIZE)) > 0) {
+						if(!memcmp(buff, "SMAG", 4)) {
+							printf("recive: x = %f, y = %f, z = %f\n", trans.mx, trans.my, trans.mz);
+							//write to control
+//							if(write(s->local, buff, 32) != 32)
+//								printf("remote error: write error\n");
+						} else if(!memcmp(buff, "SGPS", 4)) {
+							make_and_send(s->local, trans.longitude, trans.latitude, 0, 0, 0);
+						}
 						if(write(s->remot, recv_ok, 4) != 4)
 							printf("remote error: write error\n");
 
@@ -234,3 +231,4 @@ int main(void)
 	}
 	return 0;
 }
+
